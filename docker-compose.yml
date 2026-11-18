@@ -1,0 +1,47 @@
+name: tracelens
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tracelens
+      POSTGRES_PASSWORD: tracelens
+      POSTGRES_DB: tracelens
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracelens -d tracelens"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg2://tracelens:tracelens@db:5432/tracelens
+      JWT_SECRET: change-this-tracelens-secret-key-before-deploying-2024
+      MEDIA_DIR: /data/media
+      # YOLO_MODEL: yolo11s.pt      # larger model = better detection, slower
+      # FRAME_STRIDE: "2"           # analyse more frames per second of video
+      # MATCH_THRESHOLD: "0.75"     # higher = stricter cross-camera matching
+    volumes:
+      - media:/data/media
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8083:8000"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  media:
